@@ -4,7 +4,7 @@ on:
   push:
     branches:
       - main
-  pull_request:
+  workflow_dispatch:
 
 jobs:
   autograde:
@@ -15,21 +15,17 @@ jobs:
         image: mysql:8.0
         env:
           MYSQL_ROOT_PASSWORD: root
-          MYSQL_DATABASE: CollegeDB
         ports:
           - 3306:3306
         options: >-
-          --health-cmd="mysqladmin ping -uroot -proot"
+          --health-cmd="mysqladmin ping -proot"
           --health-interval=10s
           --health-timeout=5s
           --health-retries=20
 
     steps:
-
       - name: Checkout Repository
         uses: actions/checkout@v4
-        with:
-          fetch-depth: 2
 
       - name: Install MySQL Client
         run: |
@@ -38,38 +34,25 @@ jobs:
 
       - name: Wait for MySQL
         run: |
-          until mysqladmin ping -h127.0.0.1 -uroot -proot --silent
+          until mysqladmin ping -h127.0.0.1 -P3306 -uroot -proot --silent
           do
             echo "Waiting for MySQL..."
             sleep 2
           done
 
-      - name: Detect Changed Assignment
-        id: changed
-        run: |
-          echo "Changed files:"
-          git diff --name-only HEAD~1 HEAD
-
-          folders=$(git diff --name-only HEAD~1 HEAD | cut -d'/' -f1 | sort -u)
-
-          echo "Folders changed:"
-          echo "$folders"
-
-          echo "folders<<EOF" >> $GITHUB_OUTPUT
-          echo "$folders" >> $GITHUB_OUTPUT
-          echo "EOF" >> $GITHUB_OUTPUT
-
-      - name: Run Tests
+      - name: Run Assignment Tests
+        shell: bash
         run: |
 
-          for folder in ${{ steps.changed.outputs.folders }}
+          for folder in Assignment*/
           do
 
             if [ -f "$folder/tests/test.sh" ]; then
 
-              echo "=================================="
-              echo "Running tests for $folder"
-              echo "=================================="
+              echo ""
+              echo "====================================="
+              echo "Running $folder"
+              echo "====================================="
 
               chmod +x "$folder/tests/test.sh"
 
@@ -78,11 +61,9 @@ jobs:
                 ./tests/test.sh
               )
 
-            else
-              echo "Skipping $folder"
             fi
 
           done
 
-      - name: Completed
-        run: echo "Autograding Completed Successfully"
+      - name: Finished
+        run: echo "All tests completed successfully."
